@@ -43,7 +43,7 @@ The algorithm may not give a value for any of the [optional] fields, so the prog
 
 Example
 
-Voltage source, resistance and inductor in series
+12v Voltage source, 23Ohm resistance and 20mH inductor in series
 ```
 N1
 N2
