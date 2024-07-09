@@ -1,5 +1,5 @@
 # Circuit Scan
-*status:* Alfa (not functional)
+*status:* Alfa 
 
 Optical recognition system for electronic symbols, focused on the recognition of electronic circuits for export in SPICE format
 
@@ -16,8 +16,6 @@ Optical recognition system for electronic symbols, focused on the recognition of
 
 **How to Use**
 
-**how to use**
-
 create python env if necessary
 
 ```
@@ -26,9 +24,15 @@ py -m venv .
 
 install dependencies
 ```
-pip install tensorflow
+pip install install huggingface-hub datasets tensorflow==2.15.0 opencv-python
 ```
 
 ```
 python imagetest.py [classif_model_path] [ssd_model_path] [classname ...] [imagepath]
 ```
+
+## Issues
+
+If you have compatibility problems with tensorflow with respect to other libraries, consider installing libraries from around Nov 14, 2023.
+
+The code can easily run in Google Colab, because it was worked from said environment

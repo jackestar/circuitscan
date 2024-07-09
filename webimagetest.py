@@ -4,11 +4,6 @@ if len(sys.argv)<7:
     print("python imagetest.py [classif_model_path] [ssd_model_path] [classname ...] [imagepath]")
     sys.exit(1)
 
-# for i in sys.argv:
-    # print(i)
-# print(sys.argv[7])
-
-import numpy as np
 import tensorflow as tf
 from tensorflow.keras import layers
 from tensorflow.keras.applications.mobilenet_v2 import preprocess_input
@@ -17,7 +12,7 @@ import tensorflow_hub as hub
 from ipywidgets import interact, IntSlider, FloatSlider
 from PIL import Image, ImageDraw, ImageFont
 import matplotlib.pyplot as plt
-
+import numpy as np
 
 # ['Capacitores', 'Fuentes', 'Inductores', 'Resistencia']
 # 'Capacitores' 'Fuentes' 'Inductores' 'Resistencia'
@@ -94,6 +89,19 @@ def adjust_brightness_contrast(image, brightness=0, contrast=0):
     image = np.clip(image, 0, 255)
     return np.uint8(image)
 
+import gradio as gr
+import numpy as np
+import cv2
+import tensorflow as tf
+import sys
+import matplotlib.pyplot as plt
+from utils import adjust_brightness_contrast, detect_lines, merge_lines, draw_lines, non_max_suppression
+
+# Cargar modelos preentrenados
+ssd_model = hub.load("https://tfhub.dev/tensorflow/ssd_mobilenet_v2/2")
+classification_model = tf.keras.models.load_model("path/to/your/classification/model.h5")
+class_names = ['class1', 'class2', 'class3']  # Añadir los nombres de tus clases
+
 def detect_and_classify(image_path, ssd_model, classification_model, classes,
                         min_confidence=0.5, size_threshold=2.0, threshold=100,
                         min_line_length=50, max_line_gap=10, brightness=0, contrast=0,merge_threshold=10,exclusion_padding=0,iou_threshold=0.5):
@@ -109,7 +117,6 @@ def detect_and_classify(image_path, ssd_model, classification_model, classes,
     (h, w) = image.shape[:2]
 
     # Convertir la imagen a formato adecuado para el modelo de detección
-    # image_resized = cv2.resize(image, (600, 600))
     image_resized = image
     image_resized = cv2.cvtColor(image_resized, cv2.COLOR_BGR2RGB)
     image_resized = np.expand_dims(image_resized, axis=0)
@@ -136,7 +143,7 @@ def detect_and_classify(image_path, ssd_model, classification_model, classes,
                 'box': (startX, startY, endX, endY),
                 'area': area
             })
-    # print(detection_scores)
+    
     # Normalización del tamaño de detección
     if detected_objects:
         areas = [obj['area'] for obj in detected_objects]
@@ -226,10 +233,11 @@ def detect_and_classify(image_path, ssd_model, classification_model, classes,
     plt.show()
 
     # Devolver resultados
+    results = []
     for group_idx, group in enumerate(connected_groups, 1):
         for obj in group:
             connections_text = f"Grupo {group_idx}"
-            print(f"Objeto {connected_objects.index(obj) + 1}: Clase detectada: {obj['predicted_class']}, Confianza: {obj['confidence_score'] * 100:.2f}%, Ubicación: {obj['box']} {connections_text}")
+            results.append(f"Objeto {connected_objects.index(obj) + 1}: Clase detectada: {obj['predicted_class']}, Confianza: {obj['confidence_score'] * 100:.2f}%, Ubicación: {obj['box']} {connections_text}")
 
     for i, obj in enumerate(connected_objects):
         connections_text = ""
@@ -240,25 +248,39 @@ def detect_and_classify(image_path, ssd_model, classification_model, classes,
             elif connection[1] == obj:
                 connected_obj = connection[0]
                 connections_text += f" Conectado a Objeto {connected_objects.index(connected_obj) + 1}"
-        print(f"Objeto {i + 1}: Clase detectada: {obj['predicted_class']}, Confianza: {obj['confidence_score'] * 100:.2f}%, Ubicación: {obj['box']} {connections_text}")
+        results.append(f"Objeto {i + 1}: Clase detectada: {obj['predicted_class']}, Confianza: {obj['confidence_score'] * 100:.2f}%, Ubicación: {obj['box']} {connections_text}")
+
+    return results, orig_image
 
 # Definir la función interactiva
 def interactive_detection(image_path, min_confidence, size_threshold, threshold, min_line_length, max_line_gap, brightness, contrast,merge_threshold,exclusion_padding,iou_threshold):
-    detect_and_classify(image_path, ssd_model, classification_model, class_names,
-                        min_confidence, size_threshold, threshold,
-                        min_line_length, max_line_gap, brightness, contrast,merge_threshold,exclusion_padding,iou_threshold)
+    results, processed_image = detect_and_classify(image_path, ssd_model, classification_model, class_names,
+                                                   min_confidence, size_threshold, threshold,
+                                                   min_line_length, max_line_gap, brightness, contrast, merge_threshold, exclusion_padding, iou_threshold)
+    return results, processed_image
 
-image_path = sys.argv[7]
-image_size = (224,224)
-interact(interactive_detection,
-         image_path=image_path,
-         min_confidence=FloatSlider(value=0.16, min=0.0, max=1.0, step=0.01, description='Min Conf.'),
-         size_threshold=FloatSlider(value=0.5, min=0.1, max=2.0, step=0.1, description='Size Threshold'),
-         threshold=IntSlider(value=30, min=1, max=150, step=1, description='Threshold'),
-         min_line_length=IntSlider(value=20, min=1, max=100, step=1, description='Min Line Length'),
-         max_line_gap=IntSlider(value=25, min=1, max=50, step=1, description='Max Line Gap'),
-         brightness=IntSlider(value=1, min=1, max=255, step=5, description='brigthness'),
-         contrast=IntSlider(value=100, min=1, max=255, step=5, description='contrast'),
-         merge_threshold=IntSlider(value=4, min=0, max=255, step=5, description='mergethreshold'),
-         exclusion_padding=IntSlider(value=0, min=0, max=255, step=5, description='exclusion padding'),
-         iou_threshold=FloatSlider(value=0.03, min=0, max=5, step=0.5, description='iou threshold'))
+# Crear la interfaz gráfica con Gradio
+iface = gr.Interface(
+    fn=interactive_detection,
+    inputs=[
+        gr.Image(type="filepath"),
+        gr.Slider(minimum=0.0, maximum=1.0, step=0.01, label="Min Conf."),
+        gr.Slider(minimum=0.1, maximum=2.0, step=0.1, label="Size Threshold"),
+        gr.Slider(minimum=1, maximum=150, step=1, label="Threshold"),
+        gr.Slider(minimum=1, maximum=100, step=1, label="Min Line Length"),
+        gr.Slider(minimum=1, maximum=50, step=1, label="Max Line Gap"),
+        gr.Slider(minimum=0, maximum=255, step=5, label="Brightness"),
+        gr.Slider(minimum=0, maximum=255, step=5, label="Contrast"),
+        gr.Slider(minimum=0, maximum=255, step=5, label="Merge Threshold"),
+        gr.Slider(minimum=0, maximum=255, step=5, label="Exclusion Padding"),
+        gr.Slider(minimum=0, maximum=1, step=0.01, label="IoU Threshold"),
+    ],
+    outputs=[
+        gr.Textbox(label="Resultados"),
+        gr.Image(label="Imagen Procesada")
+    ],
+    title="Detección y Clasificación de Objetos",
+    description="Sube una imagen y ajusta los parámetros para detectar y clasificar objetos."
+)
+
+iface.launch()
