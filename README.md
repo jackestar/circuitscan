@@ -12,3 +12,23 @@ Optical recognition system for electronic symbols, focused on the recognition of
     * Value entry for each recognized component
 * Generate a format that is read by a circuit simulator (SPICE)
 * Simulate
+
+
+**How to Use**
+
+**how to use**
+
+create python env if necessary
+
+```
+py -m venv .
+```
+
+install dependencies
+```
+pip install tensorflow
+```
+
+```
+python imagetest.py [classif_model_path] [ssd_model_path] [classname ...] [imagepath]
+```
